@@ -76,10 +76,10 @@ class WeatherDataRequest(object):
         for d in sorted([date for date in self.dates]):
             if (not lastdate) or d.year != lastdate.year:
                 # some stations have gaps in data.  find stations that acutally exist for this year on NOAA's site
-                print "\nretrieving list of stations for year: %s ... \n" % str(d.year)
+                print("\nretrieving list of stations for year: {} ... \n".format(d.year))
                 p1 = Popen(['curl','ftp://ftp.ncdc.noaa.gov/pub/data/noaa/%s/' % str(d.year)], stdout=PIPE)
                 p2 = Popen(['grep','-o','[0-9]\{6\}-[0-9]\{5\}'], stdin=p1.stdout, stdout=PIPE)
-                actual_ids = p2.communicate()[0].split("\n")[:-1]
+                actual_ids = p2.communicate()[0].decode().split("\n")[:-1]
             
                 cand_ids = [_id for _id in self.stns if
                             self.stns[_id]['sd'] < d and
@@ -105,7 +105,7 @@ class WeatherDataRequest(object):
                             self.stns_metadata[_id]['dist'] = haversine(self.lat, self.lon, self.stns[_id]['lat'], self.stns[_id]['lon'])
                             self.stns_metadata[_id]['name'] = self.stns[_id]['name']
                     else:
-                        print "\n\nWARNING: no data found for fld=< {0} > for date=< {1} >\n".format(fld, "{:%Y-%m-%d}".format(d))
+                        print ("\n\nWARNING: no data found for fld=< {0} > for date=< {1} >\n".format(fld, "{:%Y-%m-%d}".format(d)))
                         keep_going = raw_input("Proceed anyhow? [y/n]\n")
                         if keep_going and keep_going[0].lower() == 'y':
                             pass
@@ -144,12 +144,12 @@ class WeatherDataRequest(object):
                 # get the data for this stn * yr combo
                 # fetch, uncompress, reformat, and read data file from NOAA
                 url = 'ftp://ftp.ncdc.noaa.gov/pub/data/noaa/{0}/{1}-{0}.gz'.format(yr, stn)
-                print '\nretrieving url: %s ... \n' % url 
+                print ('\nretrieving url: %s ... \n' % url )
                 p1 = Popen(["curl", url], stdout=PIPE)
                 p2 = Popen(["gunzip"], stdin=p1.stdout, stdout=PIPE)
                 p3 = Popen(['java', '-classpath', 'static', 'ishJava'], stdin=p2.stdout, stdout=PIPE)
-                data = p3.communicate()[0].split("\n")[1:-1]
-                print '\n'
+                data = p3.communicate()[0].decode().split("\n")[1:-1]
+                print ('\n')
 
                 # filter out lines for dates/times outside the query period
                 data = [x for x in data if datestr_to_dt(x[13:21]) in yrdates]
@@ -393,11 +393,11 @@ def stn_covg(path='static/ISH-HISTORY.TXT'):
     return {key: stns[key] for key in stns if stns[key]}
 
 def stn_flds(path='static/stn_flds.txt'):
-    lines = map(lambda x: x.strip(), open(path).readlines())
+    lines = list(map(lambda x: x.strip(), open(path).readlines()))
     flds = lines[0].split(',')[1:]
     out = {}
     for line in lines[1:]:
-        data = map(int, line.split(',')[1:])
+        data = list(map(int, line.split(',')[1:]))
         _id = line.split(',')[0]
         out[_id] = {}
         for i in range(len(flds)):
@@ -422,7 +422,7 @@ def main(args, update_stations=False):
     # update if arg is True, or file doesn't exist, or over 180 days stale
     if update_stations or not os.path.exists(stns_path) or (time.time() - os.path.getmtime(stns_path)) > 180 * 24 * 60 * 60:
         stns_url = 'ftp://ftp.ncdc.noaa.gov/pub/data/inventories/ISH-HISTORY.TXT'
-        print "Downloading NOAA stations list to %s ..." % stns_path
+        print ("Downloading NOAA stations list to %s ..." % stns_path)
         with open(stns_path, "w") as f:
             p1 = Popen(["curl", stns_url], stdout=PIPE)
             # US stations only
@@ -431,7 +431,7 @@ def main(args, update_stations=False):
             # kill lines with no lat/long or no WBAN code
             p3 = Popen(["grep", "-ve", "NO DATA"], stdin=p2.stdout, stdout=PIPE)
             p2.stdout.close()
-            f.write(p3.communicate()[0])
+            f.write(p3.communicate()[0].decode())
 
     # Process command line args
     # get longitude and latitude of all requested locations
@@ -481,7 +481,7 @@ def main(args, update_stations=False):
         nprocs = args.nprocs
     if nprocs:
         # make requests in parallel
-        print "making requests in parallel on < %s > processors" % str(nprocs)
+        print ("making requests in parallel on < %s > processors" % str(nprocs))
         pool = Pool(processes=nprocs)
         result = pool.map_async(run_req, reqs)
         resps = result.get()
@@ -497,7 +497,7 @@ def main(args, update_stations=False):
     if args.metadata:
         all_meta = AllWeatherMetadata([resp[1] for resp in resps])
         if args.outfile == sys.stdout:
-            print "\nStation Metadata:\n"
+            print( "\nStation Metadata:\n")
             all_meta.write(args.outfile)
         else:
             # sensible naming for metadata file
